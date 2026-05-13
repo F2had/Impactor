@@ -93,6 +93,7 @@ pub struct Impactor {
     login_windows: std::collections::HashMap<window::Id, login_window::LoginWindow>,
     pending_installation: bool,
     certificate_reset_queue: VecDeque<crate::certificate_reset::ConfirmationRequest>,
+    selected_locale: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -139,6 +140,7 @@ impl Impactor {
                 login_windows: std::collections::HashMap::new(),
                 pending_installation: false,
                 certificate_reset_queue: VecDeque::new(),
+                selected_locale: None,
             },
             open_task,
         )
@@ -572,6 +574,14 @@ impl Impactor {
                             }
                             screen.update(msg).map(Message::SettingsScreen)
                         }
+                        settings::Message::SelectLocale(choice) => {
+                            self.selected_locale = choice.clone();
+                            let effective = choice
+                                .or_else(|| current_locale::current_locale().ok())
+                                .unwrap_or_else(|| "en".to_string());
+                            rust_i18n::set_locale(&effective);
+                            Task::none()
+                        }
                         _ => screen.update(msg).map(Message::SettingsScreen),
                     }
                 } else {
@@ -835,7 +845,7 @@ impl Impactor {
             ImpactorScreen::Main(screen) => screen.view().map(Message::MainScreen),
             ImpactorScreen::Utilities(screen) => screen.view().map(Message::UtilitiesScreen),
             ImpactorScreen::Settings(screen) => screen
-                .view(&self.account_store)
+                .view(&self.account_store, &self.selected_locale)
                 .map(Message::SettingsScreen),
             ImpactorScreen::Installer(screen) => {
                 screen.view(has_device).map(Message::InstallerScreen)
